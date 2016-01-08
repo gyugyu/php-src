@@ -152,6 +152,16 @@ void fpm_pctl_kill_all(int signo) /* {{{ */
 		struct fpm_child_s *child;
 
 		for (child = wp->children; child; child = child->next) {
+			do {
+				if (fpm_state != FPM_PCTL_STATE_RELOADING) {
+					break;
+				}
+
+				if (fpm_request_is_idle(child)) {
+					break;
+				}
+			} while (1);
+
 			int res = kill(child->pid, signo);
 
 			zlog(ZLOG_DEBUG, "[pool %s] sending signal %d %s to child %d",
@@ -194,9 +204,17 @@ static void fpm_pctl_action_next() /* {{{ */
 		timeout = 1;
 	}
 
-	if (fpm_state != FPM_PCTL_STATE_RELOADING) {
-		fpm_pctl_kill_all(sig);
+	if (fpm_state == FPM_PCTL_STATE_RELOADING) {
+		fpm_cleanups_run(FPM_CLEANUP_PARENT_EXEC);
+		int ret = fpm_run_init(0);
+
+		if (ret != 0) {
+			zlog(ZLOG_SYSERROR, "failed to reload: execvp() failed");
+			exit(FPM_EXIT_SOFTWARE);
+		}
 	}
+
+	fpm_pctl_kill_all(sig);
 	fpm_signal_sent = sig;
 	fpm_pctl_timeout_set(timeout);
 }

@@ -38,6 +38,7 @@
 
 int fpm_run(int *max_requests);
 int fpm_init(int argc, char **argv, char *config, char *prefix, char *pid, int test_conf, int run_as_root, int force_daemon, int force_stderr);
+int fpm_run_init(int test_conf);
 
 struct fpm_globals_s {
 	pid_t parent_pid;
@@ -56,6 +57,7 @@ struct fpm_globals_s {
 	int heartbeat;
 	int run_as_root;
 	int force_stderr;
+	int force_daemon;
 	int send_config_pipe[2];
 };
 
