@@ -194,7 +194,9 @@ static void fpm_pctl_action_next() /* {{{ */
 		timeout = 1;
 	}
 
-	fpm_pctl_kill_all(sig);
+	if (fpm_state != FPM_PCTL_STATE_RELOADING) {
+		fpm_pctl_kill_all(sig);
+	}
 	fpm_signal_sent = sig;
 	fpm_pctl_timeout_set(timeout);
 }
