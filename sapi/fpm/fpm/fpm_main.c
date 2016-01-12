@@ -1874,6 +1874,7 @@ consult the installation file that came with this distribution, or visit \n\
 		close(fpm_globals.send_config_pipe[1]);
 	}
 	fpm_is_running = 1;
+	fpm_term_old_pid();
 
 	fcgi_fd = fpm_run(&max_requests);
 	parent = 0;

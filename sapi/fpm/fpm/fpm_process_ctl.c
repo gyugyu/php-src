@@ -20,6 +20,7 @@
 #include "fpm_worker_pool.h"
 #include "fpm_scoreboard.h"
 #include "fpm_sockets.h"
+#include "fpm_conf.h"
 #include "zlog.h"
 
 
@@ -97,10 +98,17 @@ static void fpm_pctl_exec() /* {{{ */
 		optional_arg(10)
 	);
 
-	fpm_cleanups_run(FPM_CLEANUP_PARENT_EXEC);
-	execvp(saved_argv[0], saved_argv);
-	zlog(ZLOG_SYSERROR, "failed to reload: execvp() failed");
-	exit(FPM_EXIT_SOFTWARE);
+	int pid = fork();
+	if (pid == 0) {
+		execvp(saved_argv[0], saved_argv);
+		zlog(ZLOG_SYSERROR, "failed to reload: execvp() failed");
+		exit(FPM_EXIT_SOFTWARE);
+	} else if (pid < 0) {
+		zlog(ZLOG_SYSERROR, "failed to fork()");
+		exit(FPM_EXIT_SOFTWARE);
+	} else {
+		fpm_cleanups_run(FPM_CLEANUP_PARENT_EXEC);
+	}
 }
 /* }}} */
 
@@ -108,7 +116,6 @@ static void fpm_pctl_action_last() /* {{{ */
 {
 	switch (fpm_state) {
 		case FPM_PCTL_STATE_RELOADING:
-			fpm_pctl_exec();
 			break;
 
 		case FPM_PCTL_STATE_FINISHING:
@@ -204,16 +211,6 @@ static void fpm_pctl_action_next() /* {{{ */
 		timeout = 1;
 	}
 
-	if (fpm_state == FPM_PCTL_STATE_RELOADING) {
-		fpm_cleanups_run(FPM_CLEANUP_PARENT_EXEC);
-		int ret = fpm_run_init(0);
-
-		if (ret != 0) {
-			zlog(ZLOG_SYSERROR, "failed to reload: execvp() failed");
-			exit(FPM_EXIT_SOFTWARE);
-		}
-	}
-
 	fpm_pctl_kill_all(sig);
 	fpm_signal_sent = sig;
 	fpm_pctl_timeout_set(timeout);
@@ -249,6 +246,11 @@ void fpm_pctl(int new_state, int action) /* {{{ */
 			fpm_state = new_state;
 
 			zlog(ZLOG_DEBUG, "switching to '%s' state", fpm_state_names[fpm_state]);
+
+			if (fpm_state == FPM_PCTL_STATE_RELOADING) {
+				zlog(ZLOG_DEBUG, "fpm_pctl_exec");
+				fpm_pctl_exec();
+			}
 			/* fall down */
 
 		case FPM_PCTL_ACTION_TIMEOUT :

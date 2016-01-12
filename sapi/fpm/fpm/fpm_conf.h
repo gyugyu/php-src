@@ -25,6 +25,7 @@ struct key_value_s {
  */
 struct fpm_global_config_s {
 	char *pid_file;
+	char *old_pid_file;
 	char *error_log;
 #ifdef HAVE_SYSLOG_H
 	char *syslog_ident;
@@ -114,7 +115,9 @@ enum {
 int fpm_conf_init_main(int test_conf, int force_daemon);
 int fpm_worker_pool_config_free(struct fpm_worker_pool_config_s *wpc);
 int fpm_conf_write_pid();
+int fpm_conf_write_old_pid();
 int fpm_conf_unlink_pid();
+int fpm_conf_unlink_old_pid();
 
 #endif
 

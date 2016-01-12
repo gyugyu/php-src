@@ -93,6 +93,7 @@ static char *ini_include = NULL;
  */
 static struct ini_value_parser_s ini_fpm_global_options[] = {
 	{ "pid",                         &fpm_conf_set_string,          GO(pid_file) },
+	{ "old_pid",                     &fpm_conf_set_string,          GO(old_pid_file) },
 	{ "error_log",                   &fpm_conf_set_string,          GO(error_log) },
 #ifdef HAVE_SYSLOG_H
 	{ "syslog.ident",                &fpm_conf_set_string,          GO(syslog_ident) },
@@ -1122,6 +1123,78 @@ int fpm_conf_unlink_pid() /* {{{ */
 }
 /* }}} */
 
+int fpm_conf_write_old_pid() /* {{{ */
+{
+	int fd;
+
+	if (fpm_global_config.old_pid_file) {
+		char buf[64];
+		int len;
+
+		unlink(fpm_global_config.old_pid_file);
+		fd = creat(fpm_global_config.old_pid_file, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+
+		if (fd_old < 0) {
+			zlog(ZLOG_SYSERROR, "Unable to create the old PID file (%s).", fpm_global_config.old_pid_file);
+			return -1;
+		}
+
+		len = sprintf(buf, "%d", (int) fpm_globals.parent_pid);
+
+		if (len != write(fd, buf, len)) {
+			zlog(ZLOG_SYSERROR, "Unable to write to the old PID file.");
+			close(fd);
+			return -1;
+		}
+		close(fd);
+	}
+	return 0;
+}
+/* }}} */
+
+int fpm_conf_unlink_old_pid() /* {{{ */
+{
+	if (fpm_global_config.old_pid_file) {
+		if (0 > unlink(fpm_global_config.old_pid_file)) {
+			zlog(ZLOG_SYSERROR, "Unable to remove the old PID file (%s).", fpm_global_config.old_pid_file);
+			return -1;
+		}
+	}
+	return 0;
+}
+
+int fpm_term_old_pid()
+{
+	int fd;
+
+	if (fpm_global_config.old_pid_file) {
+		char buf[64];
+		int len;
+		int old_pid;
+
+		if (0 > open(fpm_global_config.old_pid_file, O_RDONLY)) {
+			zlog(ZLOG_SYSERROR, "Unable to open the old PID file (%s).", fpm_global_config.old_pid_file);
+			return -1;
+		}
+
+		len = read(fd, buf, sizeof(buf));
+
+		if (len < 0) {
+			zlog(ZLOG_SYSERROR, "Unable to read from the old PID file.");
+			close(fd);
+			return -1;
+		}
+		close(fd);
+
+		zlog(ZLOG_DEBUG, "Killing the old PID (%s)", buf);
+		old_pid = atoi(buf);
+
+		kill((pid_t) old_pid, SIGTERM);
+	}
+	return 0;
+}
+
+/* }}} */
 int fpm_conf_write_pid() /* {{{ */
 {
 	int fd;
